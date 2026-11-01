@@ -1,57 +1,186 @@
-# DeepFace Local — lokalne GUI do porównania dwóch twarzy
+# DeepFace Local
 
-Prosty interfejs Flask + DeepFace API (FaceNet/ONNX). Dwa zdjęcia wybiera się z dysku. Obliczenia są wykonywane lokalnie w Dockerze. Nie udostępniaj portów publicznie.
+**A self-hosted face verification application powered by DeepFace, FaceNet, and Docker.**
 
-## Windows 11 — uruchomienie u znajomego
+DeepFace Local provides a lightweight web interface for comparing faces in two uploaded images. Face verification runs locally using the DeepFace API and an ONNX-based FaceNet model.
 
-Wymagania: Docker Desktop **z silnikiem Linux i backendem WSL2**, Git for Windows, dostęp do Internetu, port 8080 dostępny. W Docker Desktop musi działać silnik (Linux containers).
+The application is designed for simple deployment on Linux and Windows 11 using Docker, without requiring a separate Python installation on the host system.
 
-W PowerShell:
+## Features
+
+- **Image upload** — Select and compare two images directly from your computer.
+- **Face verification** — Determine whether two detected faces are likely to belong to the same person.
+- **Verification results** — View the decision, similarity distance, model threshold, and processing time.
+- **Local processing** — Images are processed by locally running Docker containers.
+- **Persistent model storage** — Downloaded model weights are retained in a Docker volume.
+- **Cross-platform deployment** — Supports Docker Engine on Linux and Docker Desktop with WSL2 on Windows 11.
+- **Containerized architecture** — Separate services for the web interface and DeepFace API.
+
+The current release uses **FaceNet with ONNX Runtime**. Support for additional recognition models and further interface improvements is planned.
+
+## Requirements
+
+- Docker Engine with Docker Compose, or Docker Desktop with Linux containers enabled
+- Git
+- Internet connection for initial setup and model downloads
+- Available TCP port `8080`
+- x86-64 processor
+
+Windows 11 users should enable the **WSL2 backend** in Docker Desktop.
+
+Other processor architectures have not been tested.
+
+## Installation
+
+### Windows 11
+
+Open PowerShell and run:
 
 ```powershell
-git clone https://github.com/TWOJ-LOGIN/DeepFace-Local.git
+git clone https://github.com/arturf-313/DeepFace-Local.git
 cd DeepFace-Local
 powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
-Po pierwszym uruchomieniu otwórz http://127.0.0.1:8080. Skrypt buduje obrazy, tworzy sieć i wolumen. Wagi FaceNet są pobierane przy pierwszym użyciu, o ile nie ma ich w wolumenie. Przetestowane lokalnie na Ubuntu, **nieprzetestowane jeszcze na komputerze z Windows 11**.
+### Linux
 
-Przy kolejnym uruchomieniu: `powershell -ExecutionPolicy Bypass -File .\start.ps1`, ewentualnie `docker compose start` (w folderze projektu). Zatrzymanie: `docker compose stop`. Nie ma automatycznego restartu kontenerów po włączeniu komputera.
-
-## Ubuntu — publikacja przez właściciela projektu
-
-**Nie instaluj projektu u siebie drugi raz.** Obecne kontenery `deepface-v2` i `deepface-gui` zostają bez zmian i uruchamiasz je `docker start deepface-v2 deepface-gui`.
-
-Rozpakuj ten folder do `~/Projekty/docker/DeepFace-Local`, obok obecnego `~/Projekty/docker/deepface`. Wykonaj:
+Open a terminal and run:
 
 ```bash
-cd ~/Projekty/docker/DeepFace-Local
-bash prepare-release.sh
-cat backend-commit.txt
+git clone https://github.com/arturf-313/DeepFace-Local.git
+cd DeepFace-Local
+bash start.sh
 ```
 
-Skrypt zapisze SHA commita kodu DeepFace, na którym pracujesz. Pliki źródłowe DeepFace będą pobrane na innym komputerze z oficjalnego GitHuba, z przypięciem właśnie do tego commita. Jeżeli masz niezacommitowane lokalne zmiany w kodzie upstream, skrypt przerwie przygotowanie.
+The startup scripts retrieve the required DeepFace source code from the official repository at a pinned Git commit, build the Docker images, and start the application using Docker Compose.
 
-Zobacz, co dodajesz do repozytorium: `git status` oraz `git status --ignored`. Katalog `backend/deepface/`, zdjęcia i modele są ignorowane przez Git. Następnie utwórz puste repo na github.com i wyślij projekt:
+During the first face verification request, FaceNet weights may be downloaded automatically if they are not already available in the persistent Docker volume.
 
-```bash
-git init
-git add .
-git commit -m "Initial working DeepFace Local"
-git branch -M main
-git remote add origin https://github.com/TWOJ-LOGIN/DeepFace-Local.git
-git push -u origin main
+### Open the application
+
+Once the containers are running, open:
+
+**http://127.0.0.1:8080**
+
+Upload two images and select **Compare** to run face verification.
+
+## Managing the application
+
+Run the following commands from the project directory:
+
+| Command | Description |
+|---|---|
+| `docker compose ps` | Display container status |
+| `docker compose start` | Start existing containers |
+| `docker compose stop` | Stop running containers |
+| `docker compose up -d` | Create or start application services |
+| `docker compose logs -f` | View application logs |
+| `docker compose down` | Remove application containers and their Compose network |
+
+The application does not start automatically when the computer boots.
+
+Docker volumes persist across ordinary container stops and `docker compose down`. Avoid using `docker compose down -v` unless you intentionally want to remove stored model weights.
+
+## Architecture
+
+DeepFace Local uses two services connected through a private Docker network.
+
+```text
+Web Browser
+    |
+    | http://127.0.0.1:8080
+    v
+Web Interface (Flask + Gunicorn)
+    |
+    | HTTP / Internal Docker Network
+    v
+DeepFace REST API
+    |
+    v
+FaceNet / ONNX Runtime
+    |
+    v
+Persistent Docker Volume
+(Model Weights)
 ```
 
-## Co zawiera Compose?
+| Component | Technology | Purpose |
+|---|---|---|
+| Frontend | Python 3.12, Flask, Gunicorn | Image uploads and result presentation |
+| Backend | DeepFace API, Python 3.8, ONNX Runtime | Face detection and verification |
+| Recognition model | FaceNet | Facial feature extraction and comparison |
+| Orchestration | Docker Compose | Service configuration, networking, and storage |
+| Storage | Docker named volume | Persistent AI model weights |
 
-- `api` — DeepFace ONNX, port 5000 w kontenerze, 127.0.0.1:5001 na hoście.
-- `gui` — Flask/Gunicorn, port 8080, komunikacja po wewnętrznej sieci pod adresem `http://api:5000`.
-- `deepface-models` — nazwany wolumen do zapisywania wag modelu.
-- `restart: "no"` — uruchamianie tylko na żądanie.
+The web interface communicates with the API through the internal Docker service address `http://api:5000`.
 
-Pliki obrazów użytkownika nie są trwale zapisywane przez GUI. Porty są przypięte do localhost. Wymagane CPU x86_64; inne architektury nie były testowane. Pierwszy build wymaga Internetu i może potrwać. Backend używa starego środowiska Python 3.8.12 — to lokalny projekt demonstracyjny, a nie system produkcyjny. Nie traktuj wyniku porównania jako dowodu tożsamości.
+The application exposes the following local endpoints:
 
-**Uwaga:** przy posiadaniu ręcznie utworzonych kontenerów o nazwach `deepface-v2` oraz `deepface-gui` Compose nie uruchomi duplikatów. Na nowym komputerze konfliktu nie powinno być; na Twoim Ubuntu nie wywołuj `start.sh` tego projektu bez świadomej migracji.
+- **Web interface:** `http://127.0.0.1:8080`
+- **DeepFace API:** `http://127.0.0.1:5001`
 
-Licencja DeepFace: obowiązuje licencja w oryginalnym repo https://github.com/serengil/deepface. Przed publiczną publikacją własnego kodu rozważ dodanie własnej licencji.
+## Project Structure
+
+```text
+DeepFace-Local/
+├── backend/
+│   └── README.md
+├── frontend/
+│   ├── app.py
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── static/
+│   └── templates/
+├── backend-commit.txt
+├── compose.yaml
+├── prepare-release.sh
+├── start.sh
+├── start.ps1
+├── LICENSE
+└── README.md
+```
+
+The upstream DeepFace source code is retrieved during installation and is not distributed as part of this repository. `backend-commit.txt` identifies the Git revision used for building the backend.
+
+## Privacy and Security
+
+DeepFace Local is intended for **local, self-hosted use**.
+
+- Face verification is performed locally, without using a third-party recognition API.
+- Uploaded images are processed in memory by the web application and are not intentionally stored in a persistent image database.
+- Application ports are bound to `127.0.0.1`.
+- Model weights are stored in a persistent Docker volume.
+- Images and facial verification results are not automatically uploaded to GitHub.
+
+**Important:** Facial recognition results are probabilistic and may be incorrect. They should not be treated as definitive proof of identity or used as the sole basis for security-sensitive decisions.
+
+Only process images you are authorized to use and comply with applicable privacy and data protection laws.
+
+### Security limitations
+
+The current backend uses a legacy Python 3.8 environment and older dependencies for compatibility with the selected DeepFace/ONNX implementation.
+
+This is an experimental, locally deployed application. It is **not hardened for public internet exposure or production authentication systems**.
+
+## License
+
+The custom web interface, Docker configuration, and project-specific scripts are released under the **MIT License**. See [LICENSE](LICENSE).
+
+### Third-party software
+
+This project uses [DeepFace](https://github.com/serengil/deepface), developed by **Sefik Ilkin Serengil and contributors**, and distributed under its own MIT License.
+
+DeepFace is an independent upstream project and is not owned or maintained by this repository.
+
+FaceNet and other third-party models or dependencies may be subject to separate licenses and usage conditions.
+
+## Acknowledgments
+
+- [DeepFace](https://github.com/serengil/deepface) — Face recognition framework
+- [FaceNet](https://arxiv.org/abs/1503.03832) — Face embedding methodology
+- [ONNX Runtime](https://onnxruntime.ai/) — Machine learning inference engine
+- [Docker](https://www.docker.com/) — Containerization platform
+
+---
+
+**DeepFace Local** is an independent community project built around the DeepFace framework.
