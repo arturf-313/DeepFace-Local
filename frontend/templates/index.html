@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepFace Local — Porównywanie twarzy</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header><div class="eyebrow">DEEPFACE / LOCAL TOOL</div><h1>Porównaj twarze na zdjęciach</h1><p>Wybierz dwa zdjęcia z dysku. Analizę wykonuje lokalnie DeepFace API.</p></header>
+    <form action="/" method="post" enctype="multipart/form-data" id="compare-form">
+      <div class="photos">
+        <label class="drop" for="img1"><span class="photo-title">Zdjęcie A</span><img id="preview1" alt="Podgląd zdjęcia A" hidden><span id="hint1" class="hint">Kliknij, aby wybrać JPG, PNG lub WebP</span><input id="img1" name="img1" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+        <label class="drop" for="img2"><span class="photo-title">Zdjęcie B</span><img id="preview2" alt="Podgląd zdjęcia B" hidden><span id="hint2" class="hint">Kliknij, aby wybrać JPG, PNG lub WebP</span><input id="img2" name="img2" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+      </div>
+      <div class="toolbar"><div><label for="model">Model AI</label><select id="model" disabled><option>FaceNet (ONNX)</option></select></div><button id="compare" type="submit">Porównaj zdjęcia</button></div>
+      <p class="note">Do 10 MB na zdjęcie. Zdjęcia nie są zapisywane przez ten interfejs. Wynik AI nie jest pewnym potwierdzeniem tożsamości.</p>
+    </form>
+    {% if error %}<section class="message error" role="alert"><strong>Nie udało się wykonać analizy</strong><p>{{ error }}</p></section>{% endif %}
+    {% if result %}
+    <section class="message result"><div class="eyebrow">WYNIK DEEPFACE</div><h2>{{ 'Twarze zgodne według modelu' if result.get('verified') else 'Twarze niezgodne według modelu' }}</h2><div class="metrics"><div><span>Odległość</span><b>{{ result.get('distance', '—') }}</b></div><div><span>Próg</span><b>{{ result.get('threshold', '—') }}</b></div><div><span>Model</span><b>{{ result.get('model', '—') }}</b></div><div><span>Czas (s)</span><b>{{ result.get('time', '—') }}</b></div></div><p class="note">Odległość nie jest procentowym prawdopodobieństwem tożsamości.</p></section>
+    {% endif %}
+    <footer>DeepFace Local · Panel testowy · Dostęp tylko na localhost</footer>
+  </main>
+  <script>
+    for (const n of [1, 2]) {
+      const input = document.getElementById('img' + n);
+      const preview = document.getElementById('preview' + n);
+      const hint = document.getElementById('hint' + n);
+      let oldURL;
+      input.addEventListener('change', () => {
+        if (oldURL) URL.revokeObjectURL(oldURL);
+        const file = input.files[0];
+        if (file) { oldURL = URL.createObjectURL(file); preview.src = oldURL; preview.hidden = false; hint.textContent = file.name; }
+        else { preview.hidden = true; hint.textContent = 'Kliknij, aby wybrać zdjęcie'; }
+      });
+    }
+    document.getElementById('compare-form').addEventListener('submit', () => {
+      const button = document.getElementById('compare');
+      button.disabled = true; button.textContent = 'Analizowanie…';
+    });
+  </script>
+</body>
+</html>

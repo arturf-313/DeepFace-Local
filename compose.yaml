@@ -1,0 +1,41 @@
+name: deepface-local
+
+services:
+  api:
+    container_name: deepface-v2
+    build:
+      context: ./backend/deepface
+      args:
+        BACKEND: onnx
+    image: deepface-local:1.0
+    ports:
+      - "127.0.0.1:5001:5000"
+    environment:
+      DEEPFACE_BACKEND_ENGINE: onnx
+    volumes:
+      - models:/root/.deepface/weights
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/',timeout=5)"]
+      interval: 10s
+      timeout: 7s
+      retries: 30
+      start_period: 60s
+
+  gui:
+    container_name: deepface-gui
+    build:
+      context: ./frontend
+    image: deepface-gui:1.0
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DEEPFACE_API_URL: http://api:5000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  models:
+    name: deepface-models

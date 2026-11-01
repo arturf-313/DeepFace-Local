@@ -1,0 +1,18 @@
+# Oficjalny kod jest pobierany podczas pierwszego uruchomienia
+/backend/deepface/
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+# Ustawienia prywatne / dane
+.env
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.onnx
+*.h5
+*.pt
+*.pth
+*.tar
+.DS_Store
